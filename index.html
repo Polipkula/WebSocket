@@ -67,22 +67,6 @@
             pointer-events: none;
         }
 
-        .cursor {
-            position: absolute;
-            width: 2px;
-            height: 1.5em;
-            background-color: red;
-            z-index: 20;
-            pointer-events: none;
-            animation: blink 1s step-start infinite;
-        }
-
-        @keyframes blink {
-            50% {
-                opacity: 0;
-            }
-        }
-
         #status {
             margin-top: 1rem;
             font-weight: bold;
@@ -135,8 +119,7 @@
         const editorContainer = document.getElementById('editor-container');
         const status = document.getElementById('status');
         const usersDiv = document.getElementById('users');
-        const cursors = {}; // Store cursor elements
-        const highlights = {}; // Store highlight elements
+        const highlights = {}; // Store highlight elements for each user
 
         let userId;
 
@@ -168,27 +151,10 @@
 
             if (data.type === 'user_disconnected') {
                 usersDiv.innerHTML = usersDiv.innerHTML.replace(`<span class="user">${data.userId}</span>`, '');
-                if (cursors[data.userId]) {
-                    cursors[data.userId].remove();
-                    delete cursors[data.userId];
-                }
                 if (highlights[data.userId]) {
                     highlights[data.userId].remove();
                     delete highlights[data.userId];
                 }
-            }
-
-            if (data.type === 'cursor_position') {
-                if (!cursors[data.userId]) {
-                    const cursor = document.createElement('div');
-                    cursor.className = 'cursor';
-                    cursor.style.backgroundColor = data.userColor;
-                    editorContainer.appendChild(cursor);
-                    cursors[data.userId] = cursor;
-                }
-                const cursor = cursors[data.userId];
-                cursor.style.left = `${data.position.x}px`;
-                cursor.style.top = `${data.position.y}px`;
             }
 
             if (data.type === 'selection') {
@@ -199,16 +165,16 @@
                     editorContainer.appendChild(highlight);
                     highlights[data.userId] = highlight;
                 }
+                const rect = editor.getBoundingClientRect();
+                const startOffset = getCaretCoordinates(editor, data.selection.start);
+                const endOffset = getCaretCoordinates(editor, data.selection.end);
                 const highlight = highlights[data.userId];
-                highlight.style.left = `${data.selection.start}px`;
-                highlight.style.width = `${data.selection.end - data.selection.start}px`;
-                highlight.style.top = `0px`;
+                highlight.style.left = `${rect.left + startOffset.left}px`;
+                highlight.style.top = `${rect.top + startOffset.top}px`;
+                highlight.style.width = `${endOffset.left - startOffset.left}px`;
+                highlight.style.height = `${endOffset.top - startOffset.top + 16}px`;
             }
         };
-
-        editor.addEventListener('input', () => {
-            ws.send(JSON.stringify({ type: 'update_text', text: editor.value }));
-        });
 
         editor.addEventListener('mouseup', () => {
             const start = editor.selectionStart;
@@ -217,12 +183,30 @@
             ws.send(JSON.stringify({ type: 'selection', selection: { start, end } }));
         });
 
-        editor.addEventListener('mousemove', (event) => {
-            const rect = editor.getBoundingClientRect();
-            const x = event.clientX - rect.left;
-            const y = event.clientY - rect.top;
-            ws.send(JSON.stringify({ type: 'cursor_position', position: { x, y } }));
-        });
+        // Function to calculate caret position
+        function getCaretCoordinates(element, position) {
+            const div = document.createElement('div');
+            const style = window.getComputedStyle(element);
+            [...style].forEach((key) => {
+                div.style[key] = style[key];
+            });
+            div.style.position = 'absolute';
+            div.style.whiteSpace = 'pre-wrap';
+            div.style.visibility = 'hidden';
+            div.textContent = element.value.slice(0, position);
+
+            const span = document.createElement('span');
+            span.textContent = element.value[position] || '.';
+            div.appendChild(span);
+
+            document.body.appendChild(div);
+            const coordinates = {
+                left: span.offsetLeft,
+                top: span.offsetTop,
+            };
+            document.body.removeChild(div);
+            return coordinates;
+        }
     </script>
 </body>
 </html>
