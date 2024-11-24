@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ječná Docs</title>
+    <style>
+        #editor {
+            width: 100%;
+            height: 300px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Ječná Docs</h1>
+    <textarea id="editor" placeholder="Start typing..."></textarea>
+    <div id="status">Connecting...</div>
+    <div id="users">Users online: 0</div>
+
+    <script>
+        const editor = document.getElementById("editor");
+        const status = document.getElementById("status");
+        const users = document.getElementById("users");
+        const ws = new WebSocket("ws://localhost:8080");
+
+        ws.onopen = () => {
+            status.innerText = "Connected to server";
+        };
+
+        ws.onclose = () => {
+            status.innerText = "Disconnected from server";
+        };
+
+        ws.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+
+            if (data.type === "init") {
+                editor.value = data.content;
+                users.innerText = `Users online: ${data.users}`;
+            } else if (data.type === "update") {
+                editor.value = data.content;
+            } else if (data.type === "disconnect") {
+                users.innerText = `Users online: ${data.users}`;
+            }
+        };
+
+        editor.addEventListener("input", () => {
+            const content = editor.value;
+            ws.send(JSON.stringify({ type: "update", content }));
+        });
+    </script>
+</body>
+</html>
