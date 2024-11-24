@@ -11,6 +11,7 @@
             padding: 0;
             background-color: #f4f4f9;
             color: #333;
+            position: relative;
         }
 
         header {
@@ -52,15 +53,15 @@
             background-color: white;
             color: #333;
             margin-top: 1rem;
-            position: relative;
             white-space: pre-wrap;
             overflow-wrap: break-word;
+            line-height: 1.5;
+            position: relative;
         }
 
         .highlight {
             background-color: rgba(255, 223, 0, 0.5);
             position: absolute;
-            pointer-events: none;
             z-index: 1;
         }
 
@@ -70,6 +71,7 @@
             height: 20px;
             z-index: 10;
             pointer-events: none;
+            background-color: red;
             animation: blink 1s step-start infinite;
         }
 
@@ -82,7 +84,6 @@
         #status {
             margin-top: 1rem;
             font-weight: bold;
-            color: green;
         }
 
         #users {
@@ -127,7 +128,7 @@
     </footer>
 
     <script>
-        const ws = new WebSocket("ws://18.199.32.143:8080"); // Update with your server address
+        const ws = new WebSocket("ws://18.199.32.143:8080");
         const editor = document.getElementById('editor');
         const status = document.getElementById('status');
         const usersDiv = document.getElementById('users');
@@ -210,9 +211,17 @@
 
         editor.addEventListener('mouseup', () => {
             const selection = window.getSelection();
-            const start = selection.anchorOffset;
-            const end = selection.focusOffset;
+            const start = editor.selectionStart;
+            const end = editor.selectionEnd;
+
             ws.send(JSON.stringify({ type: 'selection', selection: { start, end } }));
+        });
+
+        editor.addEventListener('mousemove', (event) => {
+            const rect = editor.getBoundingClientRect();
+            const x = event.clientX - rect.left;
+            const y = event.clientY - rect.top;
+            ws.send(JSON.stringify({ type: 'cursor_position', position: { x, y } }));
         });
     </script>
 </body>
