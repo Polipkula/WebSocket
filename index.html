@@ -18,6 +18,7 @@
             color: white;
             padding: 1rem 2rem;
             text-align: center;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
         }
 
         h1 {
@@ -50,17 +51,20 @@
             resize: none;
             background-color: white;
             color: #333;
+            margin-top: 1rem;
             white-space: pre-wrap;
             overflow-wrap: break-word;
             line-height: 1.5;
             font-family: monospace;
+            position: relative;
+            z-index: 10;
         }
 
         .highlight {
             position: absolute;
             background-color: rgba(255, 223, 0, 0.5);
+            z-index: 5;
             pointer-events: none;
-            z-index: 1;
         }
 
         .cursor {
@@ -68,7 +72,8 @@
             width: 2px;
             height: 1.5em;
             background-color: red;
-            z-index: 2;
+            z-index: 20;
+            pointer-events: none;
             animation: blink 1s step-start infinite;
         }
 
@@ -80,10 +85,30 @@
 
         #status {
             margin-top: 1rem;
+            font-weight: bold;
         }
 
         #users {
             margin-top: 1rem;
+            padding: 1rem;
+            background: #e7f7e7;
+            border: 1px solid #4CAF50;
+            border-radius: 8px;
+            width: 100%;
+            text-align: left;
+            font-size: 0.9rem;
+        }
+
+        .user {
+            font-weight: bold;
+            color: #4CAF50;
+        }
+
+        footer {
+            margin-top: 2rem;
+            text-align: center;
+            font-size: 0.8rem;
+            color: #777;
         }
     </style>
 </head>
@@ -97,18 +122,32 @@
             <textarea id="editor" placeholder="Start typing..."></textarea>
         </div>
         <div id="status">Connecting...</div>
-        <div id="users">Connected users: None</div>
+        <div id="users">Connected users: <span class="user">None</span></div>
     </main>
+
+    <footer>
+        <p>Powered by Ječná Docs - Real-time Collaboration</p>
+    </footer>
 
     <script>
         const ws = new WebSocket("ws://18.199.32.143:8080");
         const editor = document.getElementById('editor');
         const editorContainer = document.getElementById('editor-container');
-        const cursors = {};
-        const highlights = {};
+        const status = document.getElementById('status');
+        const usersDiv = document.getElementById('users');
+        const cursors = {}; // Store cursor elements
+        const highlights = {}; // Store highlight elements
+
+        let userId;
 
         ws.onopen = () => {
-            document.getElementById('status').textContent = "Connected to server";
+            status.textContent = "Connected to server";
+            status.style.color = "green";
+        };
+
+        ws.onclose = () => {
+            status.textContent = "Disconnected from server";
+            status.style.color = "red";
         };
 
         ws.onmessage = (event) => {
@@ -116,10 +155,27 @@
 
             if (data.type === 'init') {
                 editor.value = data.text;
+                usersDiv.innerHTML = `Connected users: ${data.users.map(u => `<span class="user">${u.userId}</span>`).join(', ')}`;
             }
 
-            if (data.type === 'update_text') {
+            if (data.type === 'update_text' && data.userId !== userId) {
                 editor.value = data.text;
+            }
+
+            if (data.type === 'user_connected') {
+                usersDiv.innerHTML += `, <span class="user">${data.userId}</span>`;
+            }
+
+            if (data.type === 'user_disconnected') {
+                usersDiv.innerHTML = usersDiv.innerHTML.replace(`<span class="user">${data.userId}</span>`, '');
+                if (cursors[data.userId]) {
+                    cursors[data.userId].remove();
+                    delete cursors[data.userId];
+                }
+                if (highlights[data.userId]) {
+                    highlights[data.userId].remove();
+                    delete highlights[data.userId];
+                }
             }
 
             if (data.type === 'cursor_position') {
@@ -130,10 +186,9 @@
                     editorContainer.appendChild(cursor);
                     cursors[data.userId] = cursor;
                 }
-                const rect = editor.getBoundingClientRect();
                 const cursor = cursors[data.userId];
-                cursor.style.left = `${rect.left + data.position.x}px`;
-                cursor.style.top = `${rect.top + data.position.y}px`;
+                cursor.style.left = `${data.position.x}px`;
+                cursor.style.top = `${data.position.y}px`;
             }
 
             if (data.type === 'selection') {
@@ -144,37 +199,43 @@
                     editorContainer.appendChild(highlight);
                     highlights[data.userId] = highlight;
                 }
-                const rect = editor.getBoundingClientRect();
                 const highlight = highlights[data.userId];
-                const start = data.selection.start * 7; // Approximation for monospace
-                const end = data.selection.end * 7;
+                const rect = editor.getBoundingClientRect();
+                const startX = rect.left + data.selection.startX;
+                const endX = rect.left + data.selection.endX;
+                const topY = rect.top;
 
-                highlight.style.left = `${rect.left + start}px`;
-                highlight.style.top = `${rect.top}px`;
-                highlight.style.width = `${end - start}px`;
+                highlight.style.left = `${startX}px`;
+                highlight.style.width = `${endX - startX}px`;
+                highlight.style.top = `${topY}px`;
                 highlight.style.height = `1.5em`;
             }
         };
+
+        editor.addEventListener('input', () => {
+            ws.send(JSON.stringify({ type: 'update_text', text: editor.value }));
+        });
 
         editor.addEventListener('mouseup', () => {
             const start = editor.selectionStart;
             const end = editor.selectionEnd;
 
             if (start !== end) {
-                ws.send(JSON.stringify({ type: 'selection', selection: { start, end } }));
+                ws.send(JSON.stringify({
+                    type: 'selection',
+                    selection: {
+                        startX: start * 8, // Approximated width of character in monospace
+                        endX: end * 8,
+                    }
+                }));
             }
-        });
-
-        editor.addEventListener('input', () => {
-            ws.send(JSON.stringify({ type: 'update_text', text: editor.value }));
         });
 
         editor.addEventListener('mousemove', (event) => {
             const rect = editor.getBoundingClientRect();
-            ws.send(JSON.stringify({
-                type: 'cursor_position',
-                position: { x: event.clientX - rect.left, y: event.clientY - rect.top }
-            }));
+            const x = event.clientX - rect.left;
+            const y = event.clientY - rect.top;
+            ws.send(JSON.stringify({ type: 'cursor_position', position: { x, y } }));
         });
     </script>
 </body>
