@@ -191,10 +191,15 @@
                 }
                 const highlight = highlights[data.userId];
                 const rect = editor.getBoundingClientRect();
+                const lineHeight = parseFloat(getComputedStyle(editor).lineHeight);
+
+                const startRow = Math.floor(data.selection.startY / lineHeight);
+                const endRow = Math.floor(data.selection.endY / lineHeight);
+
                 highlight.style.left = `${rect.left + data.selection.startX}px`;
                 highlight.style.width = `${data.selection.endX - data.selection.startX}px`;
-                highlight.style.top = `${rect.top}px`;
-                highlight.style.height = `${rect.height}px`;
+                highlight.style.top = `${rect.top + startRow * lineHeight}px`;
+                highlight.style.height = `${(endRow - startRow + 1) * lineHeight}px`;
             }
         };
 
@@ -203,18 +208,19 @@
         });
 
         editor.addEventListener('mouseup', () => {
-            const start = editor.selectionStart;
-            const end = editor.selectionEnd;
+            const rect = editor.getBoundingClientRect();
+            const selection = window.getSelection();
+            const range = selection.getRangeAt(0).getBoundingClientRect();
 
-            if (start !== end) {
-                ws.send(JSON.stringify({
-                    type: 'selection',
-                    selection: {
-                        startX: start * 8, // Approximation for monospace font
-                        endX: end * 8,
-                    }
-                }));
-            }
+            ws.send(JSON.stringify({
+                type: 'selection',
+                selection: {
+                    startX: range.left - rect.left,
+                    startY: range.top - rect.top,
+                    endX: range.right - rect.left,
+                    endY: range.bottom - rect.top,
+                }
+            }));
         });
 
         editor.addEventListener('mousemove', (event) => {
