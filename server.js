@@ -25,8 +25,10 @@ wss.on('connection', (ws) => {
     const userColor = `hsl(${Math.floor(Math.random() * 360)}, 70%, 70%)`; // Unikátní barva
     users.push({ userId, userColor });
 
+    // Poslat inicializační data novému uživateli
     ws.send(JSON.stringify({ type: 'init', text: documentText, users }));
 
+    // Informovat ostatní uživatele o připojení nového uživatele
     wss.clients.forEach((client) => {
         if (client !== ws && client.readyState === WebSocket.OPEN) {
             client.send(JSON.stringify({ type: 'user_connected', userId, userColor }));
@@ -53,6 +55,20 @@ wss.on('connection', (ws) => {
                         userId,
                         position: data.position,
                         userColor,
+                    }));
+                }
+            });
+        }
+
+        if (data.type === 'selection') {
+            // Přeposlat informace o označení ostatním klientům
+            wss.clients.forEach((client) => {
+                if (client.readyState === WebSocket.OPEN && client !== ws) {
+                    client.send(JSON.stringify({
+                        type: 'selection',
+                        userId,
+                        selection: data.selection, // Obsahuje start a end pozice
+                        userColor, // Barva uživatele
                     }));
                 }
             });
