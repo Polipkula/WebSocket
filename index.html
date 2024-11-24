@@ -47,12 +47,28 @@
             background-color: white;
             color: #333;
             margin-top: 1rem;
-            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            position: relative;
+        }
+
+        .cursor {
+            position: absolute;
+            width: 2px;
+            height: 20px;
+            z-index: 10;
+            pointer-events: none;
+            animation: blink 1s step-start infinite;
+        }
+
+        @keyframes blink {
+            50% {
+                opacity: 0;
+            }
         }
 
         #status {
             margin-top: 1rem;
             font-weight: bold;
+            color: green;
         }
 
         #users {
@@ -86,7 +102,7 @@
 
     <main>
         <textarea id="editor" placeholder="Start typing..."></textarea>
-        <div id="status">Disconnected from server</div>
+        <div id="status">Connecting...</div>
         <div id="users">Connected users: <span class="user">None</span></div>
     </main>
 
@@ -95,11 +111,11 @@
     </footer>
 
     <script>
-        const ws = new WebSocket("ws://18.199.32.143:8080");
+        const ws = new WebSocket("ws://18.199.32.143:8080"); // Update with your server address
         const editor = document.getElementById('editor');
         const status = document.getElementById('status');
         const usersDiv = document.getElementById('users');
-        const cursors = {}; // Pro uložení kurzorů ostatních uživatelů
+        const cursors = {}; // Store the cursor elements for each user
 
         let userId;
 
@@ -117,12 +133,12 @@
             const data = JSON.parse(event.data);
 
             if (data.type === 'init') {
-                editor.value = data.text; // Načtení inicializovaného textu
+                editor.value = data.text;
                 usersDiv.innerHTML = `Connected users: ${data.users.map(u => `<span class="user">${u.userId}</span>`).join(', ')}`;
             }
 
             if (data.type === 'update_text' && data.userId !== userId) {
-                editor.value = data.text; // Aktualizace textu od ostatních uživatelů
+                editor.value = data.text;
             }
 
             if (data.type === 'user_connected') {
@@ -142,7 +158,7 @@
                     const cursor = document.createElement('div');
                     cursor.className = 'cursor';
                     cursor.style.backgroundColor = data.userColor;
-                    document.body.appendChild(cursor);
+                    editor.parentElement.appendChild(cursor);
                     cursors[data.userId] = cursor;
                 }
                 const rect = editor.getBoundingClientRect();
@@ -153,14 +169,14 @@
         };
 
         editor.addEventListener('input', () => {
-            ws.send(JSON.stringify({ type: 'update_text', text: editor.value })); // Odeslání textu
+            ws.send(JSON.stringify({ type: 'update_text', text: editor.value }));
         });
 
         editor.addEventListener('mousemove', (event) => {
             const rect = editor.getBoundingClientRect();
             const x = event.clientX - rect.left;
             const y = event.clientY - rect.top;
-            ws.send(JSON.stringify({ type: 'cursor_position', position: { x, y } })); // Odeslání pozice kurzoru
+            ws.send(JSON.stringify({ type: 'cursor_position', position: { x, y } }));
         });
     </script>
 </body>
