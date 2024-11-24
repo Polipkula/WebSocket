@@ -7,7 +7,7 @@ document_content = ""
 cursors = {}
 
 # Handler pro WebSocket připojení
-async def handler(websocket, path):  # Zahrnut argument 'path'
+async def handler(websocket, path):  # Argument 'path' musí být přítomen
     global document_content, cursors
     connected_clients.add(websocket)
 
@@ -47,6 +47,7 @@ async def handler(websocket, path):  # Zahrnut argument 'path'
             "type": "disconnect",
             "users": len(connected_clients),
         })
+
 
 # Vysílání zpráv všem klientům
 async def broadcast(message):
