@@ -71,7 +71,6 @@
             position: absolute;
             width: 2px;
             height: 1.5em;
-            background-color: red;
             z-index: 20;
             pointer-events: none;
             animation: blink 1s step-start infinite;
@@ -138,8 +137,6 @@
         const cursors = {}; // Store cursor elements
         const highlights = {}; // Store highlight elements
 
-        let userId;
-
         ws.onopen = () => {
             status.textContent = "Connected to server";
             status.style.color = "green";
@@ -162,22 +159,6 @@
                 editor.value = data.text;
             }
 
-            if (data.type === 'user_connected') {
-                usersDiv.innerHTML += `, <span class="user">${data.userId}</span>`;
-            }
-
-            if (data.type === 'user_disconnected') {
-                usersDiv.innerHTML = usersDiv.innerHTML.replace(`<span class="user">${data.userId}</span>`, '');
-                if (cursors[data.userId]) {
-                    cursors[data.userId].remove();
-                    delete cursors[data.userId];
-                }
-                if (highlights[data.userId]) {
-                    highlights[data.userId].remove();
-                    delete highlights[data.userId];
-                }
-            }
-
             if (data.type === 'cursor_position') {
                 if (!cursors[data.userId]) {
                     const cursor = document.createElement('div');
@@ -186,9 +167,10 @@
                     editorContainer.appendChild(cursor);
                     cursors[data.userId] = cursor;
                 }
+                const rect = editor.getBoundingClientRect();
                 const cursor = cursors[data.userId];
-                cursor.style.left = `${data.position.x}px`;
-                cursor.style.top = `${data.position.y}px`;
+                cursor.style.left = `${rect.left + data.position.x}px`;
+                cursor.style.top = `${rect.top + data.position.y}px`;
             }
 
             if (data.type === 'selection') {
@@ -201,20 +183,15 @@
                 }
                 const highlight = highlights[data.userId];
                 const rect = editor.getBoundingClientRect();
-                const startX = rect.left + data.selection.startX;
-                const endX = rect.left + data.selection.endX;
-                const topY = rect.top;
+                const start = calculateCaretPosition(data.selection.start, editor);
+                const end = calculateCaretPosition(data.selection.end, editor);
 
-                highlight.style.left = `${startX}px`;
-                highlight.style.width = `${endX - startX}px`;
-                highlight.style.top = `${topY}px`;
-                highlight.style.height = `1.5em`;
+                highlight.style.left = `${rect.left + start.left}px`;
+                highlight.style.top = `${rect.top + start.top}px`;
+                highlight.style.width = `${end.left - start.left}px`;
+                highlight.style.height = `${end.height}px`;
             }
         };
-
-        editor.addEventListener('input', () => {
-            ws.send(JSON.stringify({ type: 'update_text', text: editor.value }));
-        });
 
         editor.addEventListener('mouseup', () => {
             const start = editor.selectionStart;
@@ -223,10 +200,7 @@
             if (start !== end) {
                 ws.send(JSON.stringify({
                     type: 'selection',
-                    selection: {
-                        startX: start * 8, // Approximated width of character in monospace
-                        endX: end * 8,
-                    }
+                    selection: { start, end },
                 }));
             }
         });
@@ -237,6 +211,30 @@
             const y = event.clientY - rect.top;
             ws.send(JSON.stringify({ type: 'cursor_position', position: { x, y } }));
         });
+
+        // Helper function to calculate caret position
+        function calculateCaretPosition(index, element) {
+            const div = document.createElement('div');
+            const style = window.getComputedStyle(element);
+            for (const key of style) {
+                div.style[key] = style[key];
+            }
+            div.style.position = 'absolute';
+            div.style.visibility = 'hidden';
+            div.style.whiteSpace = 'pre-wrap';
+            div.style.wordWrap = 'break-word';
+
+            const text = element.value.slice(0, index);
+            div.textContent = text;
+
+            document.body.appendChild(div);
+            const position = {
+                left: div.offsetWidth,
+                top: div.offsetHeight - parseFloat(style.lineHeight),
+            };
+            document.body.removeChild(div);
+            return position;
+        }
     </script>
 </body>
 </html>
