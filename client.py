@@ -13,8 +13,14 @@ async def connect():
             "content": "Hello, WebSocket!",
         }))
 
-        # Wait for a response from the server
-        response = await websocket.recv()
-        print(f"Server response: {response}")
+        # Wait for responses from the server
+        while True:
+            try:
+                response = await websocket.recv()
+                data = json.loads(response)
+                print(f"Server response: {data}")
+            except websockets.exceptions.ConnectionClosed:
+                print("Connection closed by server")
+                break
 
 asyncio.run(connect())

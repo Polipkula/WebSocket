@@ -14,7 +14,7 @@ async def handler(websocket, path):
     await websocket.send(json.dumps({
         "type": "init",
         "content": document_content,
-        "cursors": cursors,
+        "cursors": {id: cursor for id, cursor in enumerate(cursors.values())},
         "users": len(connected_clients),
     }))
 
@@ -33,27 +33,27 @@ async def handler(websocket, path):
                 cursors[websocket] = data["cursor"]
                 await broadcast({
                     "type": "cursor",
-                    "cursors": cursors,
+                    "cursors": {id: cursor for id, cursor in enumerate(cursors.values())},
                 })
 
     except websockets.exceptions.ConnectionClosed:
         print("Client disconnected")
     finally:
         connected_clients.remove(websocket)
-        cursors.pop(websocket, None)
+        if websocket in cursors:
+            del cursors[websocket]
         await broadcast({
             "type": "disconnect",
             "users": len(connected_clients),
         })
 
-
 async def broadcast(message):
     if connected_clients:
-        await asyncio.wait([client.send(json.dumps(message)) for client in connected_clients])
+        await asyncio.gather(*[client.send(json.dumps(message)) for client in connected_clients])
 
 async def main():
-    async with websockets.serve(handler, "localhost", 8080):
-        print("WebSocket server running on ws://localhost:8080")
+    async with websockets.serve(handler, "0.0.0.0", 8080):
+        print("WebSocket server running on ws://0.0.0.0:8080")
         await asyncio.Future()  # Run forever
 
 if __name__ == "__main__":
