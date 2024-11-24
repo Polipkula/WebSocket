@@ -2,19 +2,19 @@ import asyncio
 import websockets
 import json
 
-# Připojení klienta k serveru
+# Připojení ke WebSocket serveru
 async def connect():
     uri = "ws://localhost:8080"
     async with websockets.connect(uri) as websocket:
         print("Connected to the server!")
 
-        # Poslání příkladové zprávy o aktualizaci obsahu
+        # Odeslání testovací zprávy
         await websocket.send(json.dumps({
             "type": "update",
             "content": "Hello, WebSocket!",
         }))
 
-        # Čekání na odpovědi od serveru
+        # Poslouchání odpovědí od serveru
         try:
             while True:
                 response = await websocket.recv()
