@@ -7,18 +7,21 @@ const app = express();
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
+// Statické soubory
 app.use(express.static(path.join(__dirname)));
 
+// Výchozí cesta
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-let documentText = "";
-let users = [];
+// Data
+let documentText = ""; // Text dokumentu
+let users = []; // Seznam uživatelů
 
 wss.on('connection', (ws) => {
     const userId = `User-${Math.random().toString(36).substr(2, 9)}`;
-    const userColor = `hsl(${Math.floor(Math.random() * 360)}, 70%, 70%)`;
+    const userColor = `hsl(${Math.floor(Math.random() * 360)}, 70%, 70%)`; // Unikátní barva
     users.push({ userId, userColor });
 
     // Poslat inicializační data novému uživateli
@@ -35,7 +38,7 @@ wss.on('connection', (ws) => {
         const data = JSON.parse(message);
 
         if (data.type === 'update_text') {
-            documentText = data.text;
+            documentText = data.text; // Aktualizace textu na serveru
             wss.clients.forEach((client) => {
                 if (client.readyState === WebSocket.OPEN) {
                     client.send(JSON.stringify({ type: 'update_text', text: documentText, userId }));
@@ -81,6 +84,7 @@ wss.on('connection', (ws) => {
     });
 });
 
+// Spuštění serveru
 server.listen(8080, () => {
     console.log('Server is running on http://localhost:8080');
 });

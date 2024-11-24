@@ -18,7 +18,6 @@
             color: white;
             padding: 1rem 2rem;
             text-align: center;
-            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
         }
 
         h1 {
@@ -123,6 +122,20 @@
                 editor.value = data.text;
             }
 
+            if (data.type === 'cursor_position') {
+                if (!cursors[data.userId]) {
+                    const cursor = document.createElement('div');
+                    cursor.className = 'cursor';
+                    cursor.style.backgroundColor = data.userColor;
+                    editorContainer.appendChild(cursor);
+                    cursors[data.userId] = cursor;
+                }
+                const rect = editor.getBoundingClientRect();
+                const cursor = cursors[data.userId];
+                cursor.style.left = `${rect.left + data.position.x}px`;
+                cursor.style.top = `${rect.top + data.position.y}px`;
+            }
+
             if (data.type === 'selection') {
                 if (!highlights[data.userId]) {
                     const highlight = document.createElement('div');
@@ -131,14 +144,13 @@
                     editorContainer.appendChild(highlight);
                     highlights[data.userId] = highlight;
                 }
-                const highlight = highlights[data.userId];
                 const rect = editor.getBoundingClientRect();
+                const highlight = highlights[data.userId];
                 const startX = rect.left + data.selection.startX;
                 const endX = rect.left + data.selection.endX;
-                const topY = rect.top;
 
                 highlight.style.left = `${startX}px`;
-                highlight.style.top = `${topY}px`;
+                highlight.style.top = `${rect.top}px`;
                 highlight.style.width = `${endX - startX}px`;
                 highlight.style.height = `1.5em`;
             }
@@ -152,7 +164,7 @@
                 ws.send(JSON.stringify({
                     type: 'selection',
                     selection: {
-                        startX: start * 8, // Approximated width of character in monospace
+                        startX: start * 8, // Approximation for monospace
                         endX: end * 8,
                     }
                 }));
