@@ -71,7 +71,6 @@
             position: absolute;
             width: 2px;
             height: 1.5em;
-            background-color: red;
             z-index: 20;
             pointer-events: none;
             animation: blink 1s step-start infinite;
@@ -135,6 +134,7 @@
         const editorContainer = document.getElementById('editor-container');
         const status = document.getElementById('status');
         const usersDiv = document.getElementById('users');
+        const cursors = {}; // Store cursor elements
         const highlights = {}; // Store highlight elements
 
         ws.onopen = () => {
@@ -159,24 +159,37 @@
                 editor.value = data.text;
             }
 
-            if (data.type === 'selection') {
-                const { userId, selection, userColor } = data;
-
-                if (!highlights[userId]) {
-                    highlights[userId] = document.createElement('div');
-                    highlights[userId].className = 'highlight';
-                    highlights[userId].style.backgroundColor = userColor;
-                    editorContainer.appendChild(highlights[userId]);
+            if (data.type === 'cursor_position') {
+                if (!cursors[data.userId]) {
+                    const cursor = document.createElement('div');
+                    cursor.className = 'cursor';
+                    cursor.style.backgroundColor = data.userColor;
+                    editorContainer.appendChild(cursor);
+                    cursors[data.userId] = cursor;
                 }
+                const rect = editor.getBoundingClientRect();
+                const cursor = cursors[data.userId];
+                cursor.style.left = `${rect.left + data.position.x}px`;
+                cursor.style.top = `${rect.top + data.position.y}px`;
+            }
 
-                const start = calculateCaretPosition(selection.start, editor);
-                const end = calculateCaretPosition(selection.end, editor);
-                const highlight = highlights[userId];
+            if (data.type === 'selection') {
+                if (!highlights[data.userId]) {
+                    const highlight = document.createElement('div');
+                    highlight.className = 'highlight';
+                    highlight.style.backgroundColor = data.userColor;
+                    editorContainer.appendChild(highlight);
+                    highlights[data.userId] = highlight;
+                }
+                const rect = editor.getBoundingClientRect();
+                const startX = calculateCaretPosition(data.selection.start, editor).left;
+                const endX = calculateCaretPosition(data.selection.end, editor).left;
+                const highlight = highlights[data.userId];
 
-                highlight.style.left = `${start.left}px`;
-                highlight.style.top = `${start.top}px`;
-                highlight.style.width = `${end.left - start.left}px`;
-                highlight.style.height = `${end.height}px`;
+                highlight.style.left = `${rect.left + startX}px`;
+                highlight.style.top = `${rect.top}px`;
+                highlight.style.width = `${endX - startX}px`;
+                highlight.style.height = `1.5em`;
             }
         };
 
@@ -188,9 +201,15 @@
                 ws.send(JSON.stringify({
                     type: 'selection',
                     selection: { start, end },
-                    userId
                 }));
             }
+        });
+
+        editor.addEventListener('mousemove', (event) => {
+            const rect = editor.getBoundingClientRect();
+            const x = event.clientX - rect.left;
+            const y = event.clientY - rect.top;
+            ws.send(JSON.stringify({ type: 'cursor_position', position: { x, y } }));
         });
 
         // Helper function to calculate caret position
@@ -212,7 +231,6 @@
             const position = {
                 left: div.offsetWidth,
                 top: div.offsetHeight - parseFloat(style.lineHeight),
-                height: parseFloat(style.lineHeight)
             };
             document.body.removeChild(div);
             return position;
