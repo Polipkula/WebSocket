@@ -28,8 +28,8 @@ wss.on('connection', (ws) => {
     ws.send(JSON.stringify({ type: 'init', text: documentText, users }));
 
     wss.clients.forEach((client) => {
-        if (client !== ws && client.readyState === WebSocket.OPEN) {
-            client.send(JSON.stringify({ type: 'user_connected', userId, userColor }));
+        if (client.readyState === WebSocket.OPEN) {
+            client.send(JSON.stringify({ type: 'user_connected', users }));
         }
     });
 
@@ -40,7 +40,7 @@ wss.on('connection', (ws) => {
             documentText = data.text; // Aktualizace textu na serveru
             wss.clients.forEach((client) => {
                 if (client.readyState === WebSocket.OPEN) {
-                    client.send(JSON.stringify({ type: 'update_text', text: documentText, userId }));
+                    client.send(JSON.stringify({ type: 'update_text', text: documentText }));
                 }
             });
         }
@@ -59,7 +59,6 @@ wss.on('connection', (ws) => {
         }
 
         if (data.type === 'selection') {
-            // Přeposlat označení všem ostatním klientům
             wss.clients.forEach((client) => {
                 if (client.readyState === WebSocket.OPEN && client !== ws) {
                     client.send(JSON.stringify({
@@ -77,7 +76,7 @@ wss.on('connection', (ws) => {
         users = users.filter((user) => user.userId !== userId);
         wss.clients.forEach((client) => {
             if (client.readyState === WebSocket.OPEN) {
-                client.send(JSON.stringify({ type: 'user_disconnected', userId }));
+                client.send(JSON.stringify({ type: 'user_disconnected', users }));
             }
         });
     });

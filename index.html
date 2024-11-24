@@ -63,8 +63,8 @@
         .highlight {
             position: absolute;
             background-color: rgba(255, 223, 0, 0.5);
-            z-index: 5;
             pointer-events: none;
+            z-index: 5;
         }
 
         .cursor {
@@ -138,8 +138,6 @@
         const cursors = {}; // Store cursor elements
         const highlights = {}; // Store highlight elements
 
-        let userId;
-
         ws.onopen = () => {
             status.textContent = "Connected to server";
             status.style.color = "green";
@@ -155,11 +153,19 @@
 
             if (data.type === 'init') {
                 editor.value = data.text;
-                usersDiv.innerHTML = `Connected users: ${data.users.map(u => `<span class="user">${u.userId}</span>`).join(', ')}`;
+                updateUsers(data.users);
             }
 
-            if (data.type === 'update_text' && data.userId !== userId) {
+            if (data.type === 'update_text') {
                 editor.value = data.text;
+            }
+
+            if (data.type === 'user_connected') {
+                updateUsers(data.users);
+            }
+
+            if (data.type === 'user_disconnected') {
+                updateUsers(data.users);
             }
 
             if (data.type === 'cursor_position') {
@@ -184,10 +190,11 @@
                     highlights[data.userId] = highlight;
                 }
                 const highlight = highlights[data.userId];
-                highlight.style.left = `${data.selection.startX}px`;
+                const rect = editor.getBoundingClientRect();
+                highlight.style.left = `${rect.left + data.selection.startX}px`;
                 highlight.style.width = `${data.selection.endX - data.selection.startX}px`;
-                highlight.style.top = `0px`;
-                highlight.style.height = `1.5em`;
+                highlight.style.top = `${rect.top}px`;
+                highlight.style.height = `${rect.height}px`;
             }
         };
 
@@ -203,7 +210,7 @@
                 ws.send(JSON.stringify({
                     type: 'selection',
                     selection: {
-                        startX: start * 8, // Přibližná šířka znaků v monospace
+                        startX: start * 8, // Approximation for monospace font
                         endX: end * 8,
                     }
                 }));
@@ -216,6 +223,10 @@
             const y = event.clientY - rect.top;
             ws.send(JSON.stringify({ type: 'cursor_position', position: { x, y } }));
         });
+
+        function updateUsers(users) {
+            usersDiv.innerHTML = `Connected users: ${users.map(u => `<span class="user">${u.userId}</span>`).join(', ')}`;
+        }
     </script>
 </body>
 </html>
