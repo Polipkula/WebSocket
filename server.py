@@ -56,7 +56,10 @@ async def broadcast(message):
     if connected_clients:
         await asyncio.wait([client.send(json.dumps(message)) for client in connected_clients])
 
-start_server = websockets.serve(handler, "localhost", 8080)
+async def main():
+    async with websockets.serve(handler, "localhost", 8080):
+        print("WebSocket server running on ws://localhost:8080")
+        await asyncio.Future()  # Run forever
 
-asyncio.get_event_loop().run_until_complete(start_server)
-asyncio.get_event_loop().run_forever()
+if __name__ == "__main__":
+    asyncio.run(main())
