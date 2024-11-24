@@ -8,18 +8,17 @@ async def connect():
     async with websockets.connect(uri) as websocket:
         print("Connected to the server!")
 
-        # Odeslání testovací zprávy
+        # Poslání testovací zprávy
         await websocket.send(json.dumps({
             "type": "update",
             "content": "Hello, WebSocket!",
         }))
 
-        # Poslouchání odpovědí od serveru
+        # Čekání na odpovědi od serveru
         try:
             while True:
                 response = await websocket.recv()
-                data = json.loads(response)
-                print(f"Server response: {data}")
+                print(f"Server response: {response}")
         except websockets.exceptions.ConnectionClosed:
             print("Connection closed by server")
 
