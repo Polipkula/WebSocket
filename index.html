@@ -36,6 +36,11 @@
             margin: 0 auto;
         }
 
+        #editor-container {
+            position: relative;
+            width: 100%;
+        }
+
         #editor {
             width: 100%;
             height: 300px;
@@ -48,6 +53,15 @@
             color: #333;
             margin-top: 1rem;
             position: relative;
+            white-space: pre-wrap;
+            overflow-wrap: break-word;
+        }
+
+        .highlight {
+            background-color: rgba(255, 223, 0, 0.5);
+            position: absolute;
+            pointer-events: none;
+            z-index: 1;
         }
 
         .cursor {
@@ -101,7 +115,9 @@
     </header>
 
     <main>
-        <textarea id="editor" placeholder="Start typing..."></textarea>
+        <div id="editor-container">
+            <textarea id="editor" placeholder="Start typing..."></textarea>
+        </div>
         <div id="status">Connecting...</div>
         <div id="users">Connected users: <span class="user">None</span></div>
     </main>
@@ -116,6 +132,7 @@
         const status = document.getElementById('status');
         const usersDiv = document.getElementById('users');
         const cursors = {}; // Store the cursor elements for each user
+        const highlights = {}; // Store highlighted selections for each user
 
         let userId;
 
@@ -151,6 +168,10 @@
                     cursors[data.userId].remove();
                     delete cursors[data.userId];
                 }
+                if (highlights[data.userId]) {
+                    highlights[data.userId].remove();
+                    delete highlights[data.userId];
+                }
             }
 
             if (data.type === 'cursor_position') {
@@ -166,17 +187,32 @@
                 cursor.style.left = `${rect.left + data.position.x}px`;
                 cursor.style.top = `${rect.top + data.position.y}px`;
             }
+
+            if (data.type === 'selection') {
+                if (!highlights[data.userId]) {
+                    const highlight = document.createElement('div');
+                    highlight.className = 'highlight';
+                    highlight.style.backgroundColor = data.userColor;
+                    editor.parentElement.appendChild(highlight);
+                    highlights[data.userId] = highlight;
+                }
+                const rect = editor.getBoundingClientRect();
+                const highlight = highlights[data.userId];
+                highlight.style.left = `${rect.left + data.selection.start}px`;
+                highlight.style.width = `${data.selection.end - data.selection.start}px`;
+                highlight.style.top = `${rect.top}px`;
+            }
         };
 
         editor.addEventListener('input', () => {
             ws.send(JSON.stringify({ type: 'update_text', text: editor.value }));
         });
 
-        editor.addEventListener('mousemove', (event) => {
-            const rect = editor.getBoundingClientRect();
-            const x = event.clientX - rect.left;
-            const y = event.clientY - rect.top;
-            ws.send(JSON.stringify({ type: 'cursor_position', position: { x, y } }));
+        editor.addEventListener('mouseup', () => {
+            const selection = window.getSelection();
+            const start = selection.anchorOffset;
+            const end = selection.focusOffset;
+            ws.send(JSON.stringify({ type: 'selection', selection: { start, end } }));
         });
     </script>
 </body>
