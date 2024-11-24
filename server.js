@@ -57,6 +57,20 @@ wss.on('connection', (ws) => {
                 }
             });
         }
+
+        if (data.type === 'selection') {
+            // Přeposlat označení všem ostatním klientům
+            wss.clients.forEach((client) => {
+                if (client.readyState === WebSocket.OPEN && client !== ws) {
+                    client.send(JSON.stringify({
+                        type: 'selection',
+                        userId,
+                        selection: data.selection,
+                        userColor,
+                    }));
+                }
+            });
+        }
     });
 
     ws.on('close', () => {

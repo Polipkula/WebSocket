@@ -136,6 +136,7 @@
         const status = document.getElementById('status');
         const usersDiv = document.getElementById('users');
         const cursors = {}; // Store cursor elements
+        const highlights = {}; // Store highlight elements
 
         let userId;
 
@@ -161,22 +162,6 @@
                 editor.value = data.text;
             }
 
-            if (data.type === 'user_connected') {
-                usersDiv.innerHTML += `, <span class="user">${data.userId}</span>`;
-            }
-
-            if (data.type === 'user_disconnected') {
-                usersDiv.innerHTML = usersDiv.innerHTML.replace(`<span class="user">${data.userId}</span>`, '');
-                if (cursors[data.userId]) {
-                    cursors[data.userId].remove();
-                    delete cursors[data.userId];
-                }
-                if (highlights[data.userId]) {
-                    highlights[data.userId].remove();
-                    delete highlights[data.userId];
-                }
-            }
-
             if (data.type === 'cursor_position') {
                 if (!cursors[data.userId]) {
                     const cursor = document.createElement('div');
@@ -190,14 +175,40 @@
                 cursor.style.top = `${data.position.y}px`;
             }
 
-            
+            if (data.type === 'selection') {
+                if (!highlights[data.userId]) {
+                    const highlight = document.createElement('div');
+                    highlight.className = 'highlight';
+                    highlight.style.backgroundColor = data.userColor;
+                    editorContainer.appendChild(highlight);
+                    highlights[data.userId] = highlight;
+                }
+                const highlight = highlights[data.userId];
+                highlight.style.left = `${data.selection.startX}px`;
+                highlight.style.width = `${data.selection.endX - data.selection.startX}px`;
+                highlight.style.top = `0px`;
+                highlight.style.height = `1.5em`;
+            }
         };
 
         editor.addEventListener('input', () => {
             ws.send(JSON.stringify({ type: 'update_text', text: editor.value }));
         });
 
-        
+        editor.addEventListener('mouseup', () => {
+            const start = editor.selectionStart;
+            const end = editor.selectionEnd;
+
+            if (start !== end) {
+                ws.send(JSON.stringify({
+                    type: 'selection',
+                    selection: {
+                        startX: start * 8, // Přibližná šířka znaků v monospace
+                        endX: end * 8,
+                    }
+                }));
+            }
+        });
 
         editor.addEventListener('mousemove', (event) => {
             const rect = editor.getBoundingClientRect();
