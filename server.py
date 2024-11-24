@@ -6,15 +6,16 @@ connected_clients = set()
 document_content = ""
 cursors = {}
 
-async def handler(websocket, path):
+# Handler pro správu WebSocket připojení
+async def handler(websocket, path):  # Opraveno: Přidán argument 'path'
     global document_content, cursors
     connected_clients.add(websocket)
 
-    # Send the initial data to the client
+    # Pošlete počáteční data klientovi
     await websocket.send(json.dumps({
         "type": "init",
         "content": document_content,
-        "cursors": {id: cursor for id, cursor in enumerate(cursors.values())},
+        "cursors": {id(client): cursor for client, cursor in cursors.items()},
         "users": len(connected_clients),
     }))
 
@@ -33,7 +34,7 @@ async def handler(websocket, path):
                 cursors[websocket] = data["cursor"]
                 await broadcast({
                     "type": "cursor",
-                    "cursors": {id: cursor for id, cursor in enumerate(cursors.values())},
+                    "cursors": {id(client): cursor for client, cursor in cursors.items()},
                 })
 
     except websockets.exceptions.ConnectionClosed:
@@ -47,14 +48,16 @@ async def handler(websocket, path):
             "users": len(connected_clients),
         })
 
+# Funkce pro odesílání zpráv všem připojeným klientům
 async def broadcast(message):
     if connected_clients:
         await asyncio.gather(*[client.send(json.dumps(message)) for client in connected_clients])
 
+# Hlavní funkce serveru
 async def main():
-    async with websockets.serve(handler, "0.0.0.0", 8080):
+    async with websockets.serve(handler, "0.0.0.0", 8080):  # Server naslouchá na všech IP
         print("WebSocket server running on ws://0.0.0.0:8080")
-        await asyncio.Future()  # Run forever
+        await asyncio.Future()  # Běží nekonečně
 
 if __name__ == "__main__":
     asyncio.run(main())
