@@ -136,7 +136,6 @@
         const status = document.getElementById('status');
         const usersDiv = document.getElementById('users');
         const cursors = {}; // Store cursor elements
-        const highlights = {}; // Store highlight elements
 
         let userId;
 
@@ -191,45 +190,14 @@
                 cursor.style.top = `${data.position.y}px`;
             }
 
-            if (data.type === 'selection') {
-                if (!highlights[data.userId]) {
-                    const highlight = document.createElement('div');
-                    highlight.className = 'highlight';
-                    highlight.style.backgroundColor = data.userColor;
-                    editorContainer.appendChild(highlight);
-                    highlights[data.userId] = highlight;
-                }
-                const highlight = highlights[data.userId];
-                const rect = editor.getBoundingClientRect();
-                const startX = rect.left + data.selection.startX;
-                const endX = rect.left + data.selection.endX;
-                const topY = rect.top;
-
-                highlight.style.left = `${startX}px`;
-                highlight.style.width = `${endX - startX}px`;
-                highlight.style.top = `${topY}px`;
-                highlight.style.height = `1.5em`;
-            }
+            
         };
 
         editor.addEventListener('input', () => {
             ws.send(JSON.stringify({ type: 'update_text', text: editor.value }));
         });
 
-        editor.addEventListener('mouseup', () => {
-            const start = editor.selectionStart;
-            const end = editor.selectionEnd;
-
-            if (start !== end) {
-                ws.send(JSON.stringify({
-                    type: 'selection',
-                    selection: {
-                        startX: start * 8, // Approximated width of character in monospace
-                        endX: end * 8,
-                    }
-                }));
-            }
-        });
+        
 
         editor.addEventListener('mousemove', (event) => {
             const rect = editor.getBoundingClientRect();
