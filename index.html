@@ -135,7 +135,10 @@
         const editorContainer = document.getElementById('editor-container');
         const status = document.getElementById('status');
         const usersDiv = document.getElementById('users');
+        const cursors = {}; // Store cursor elements
         const highlights = {}; // Store highlight elements
+
+        let userId;
 
         ws.onopen = () => {
             status.textContent = "Connected to server";
@@ -159,26 +162,59 @@
                 editor.value = data.text;
             }
 
-            if (data.type === 'selection') {
-                const { userId, selection, userColor } = data;
+            if (data.type === 'user_connected') {
+                usersDiv.innerHTML += `, <span class="user">${data.userId}</span>`;
+            }
 
-                if (!highlights[userId]) {
-                    highlights[userId] = document.createElement('div');
-                    highlights[userId].className = 'highlight';
-                    highlights[userId].style.backgroundColor = userColor;
-                    editorContainer.appendChild(highlights[userId]);
+            if (data.type === 'user_disconnected') {
+                usersDiv.innerHTML = usersDiv.innerHTML.replace(`<span class="user">${data.userId}</span>`, '');
+                if (cursors[data.userId]) {
+                    cursors[data.userId].remove();
+                    delete cursors[data.userId];
                 }
+                if (highlights[data.userId]) {
+                    highlights[data.userId].remove();
+                    delete highlights[data.userId];
+                }
+            }
 
-                const start = calculateCaretPosition(selection.start, editor);
-                const end = calculateCaretPosition(selection.end, editor);
-                const highlight = highlights[userId];
+            if (data.type === 'cursor_position') {
+                if (!cursors[data.userId]) {
+                    const cursor = document.createElement('div');
+                    cursor.className = 'cursor';
+                    cursor.style.backgroundColor = data.userColor;
+                    editorContainer.appendChild(cursor);
+                    cursors[data.userId] = cursor;
+                }
+                const cursor = cursors[data.userId];
+                cursor.style.left = `${data.position.x}px`;
+                cursor.style.top = `${data.position.y}px`;
+            }
 
-                highlight.style.left = `${start.left}px`;
-                highlight.style.top = `${start.top}px`;
-                highlight.style.width = `${end.left - start.left}px`;
-                highlight.style.height = `${end.height}px`;
+            if (data.type === 'selection') {
+                if (!highlights[data.userId]) {
+                    const highlight = document.createElement('div');
+                    highlight.className = 'highlight';
+                    highlight.style.backgroundColor = data.userColor;
+                    editorContainer.appendChild(highlight);
+                    highlights[data.userId] = highlight;
+                }
+                const highlight = highlights[data.userId];
+                const rect = editor.getBoundingClientRect();
+                const startX = rect.left + data.selection.startX;
+                const endX = rect.left + data.selection.endX;
+                const topY = rect.top;
+
+                highlight.style.left = `${startX}px`;
+                highlight.style.width = `${endX - startX}px`;
+                highlight.style.top = `${topY}px`;
+                highlight.style.height = `1.5em`;
             }
         };
+
+        editor.addEventListener('input', () => {
+            ws.send(JSON.stringify({ type: 'update_text', text: editor.value }));
+        });
 
         editor.addEventListener('mouseup', () => {
             const start = editor.selectionStart;
@@ -187,36 +223,20 @@
             if (start !== end) {
                 ws.send(JSON.stringify({
                     type: 'selection',
-                    selection: { start, end },
-                    userId
+                    selection: {
+                        startX: start * 8, // Approximated width of character in monospace
+                        endX: end * 8,
+                    }
                 }));
             }
         });
 
-        // Helper function to calculate caret position
-        function calculateCaretPosition(index, element) {
-            const div = document.createElement('div');
-            const style = window.getComputedStyle(element);
-            for (const key of style) {
-                div.style[key] = style[key];
-            }
-            div.style.position = 'absolute';
-            div.style.visibility = 'hidden';
-            div.style.whiteSpace = 'pre-wrap';
-            div.style.wordWrap = 'break-word';
-
-            const text = element.value.slice(0, index);
-            div.textContent = text;
-
-            document.body.appendChild(div);
-            const position = {
-                left: div.offsetWidth,
-                top: div.offsetHeight - parseFloat(style.lineHeight),
-                height: parseFloat(style.lineHeight)
-            };
-            document.body.removeChild(div);
-            return position;
-        }
+        editor.addEventListener('mousemove', (event) => {
+            const rect = editor.getBoundingClientRect();
+            const x = event.clientX - rect.left;
+            const y = event.clientY - rect.top;
+            ws.send(JSON.stringify({ type: 'cursor_position', position: { x, y } }));
+        });
     </script>
 </body>
 </html>
