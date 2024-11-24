@@ -55,20 +55,24 @@
             white-space: pre-wrap;
             overflow-wrap: break-word;
             line-height: 1.5;
+            font-family: monospace;
             position: relative;
+            z-index: 10;
         }
 
         .highlight {
-            background-color: rgba(255, 223, 0, 0.5);
             position: absolute;
-            z-index: 1;
+            background-color: rgba(255, 223, 0, 0.5);
+            z-index: 5;
+            pointer-events: none;
         }
 
         .cursor {
             position: absolute;
             width: 2px;
-            height: 20px;
-            z-index: 10;
+            height: 1.5em;
+            background-color: red;
+            z-index: 20;
             pointer-events: none;
             animation: blink 1s step-start infinite;
         }
@@ -128,10 +132,11 @@
     <script>
         const ws = new WebSocket("ws://18.199.32.143:8080");
         const editor = document.getElementById('editor');
+        const editorContainer = document.getElementById('editor-container');
         const status = document.getElementById('status');
         const usersDiv = document.getElementById('users');
-        const cursors = {}; // Store the cursor elements for each user
-        const highlights = {}; // Store highlighted selections for each user
+        const cursors = {}; // Store cursor elements
+        const highlights = {}; // Store highlight elements
 
         let userId;
 
@@ -178,13 +183,12 @@
                     const cursor = document.createElement('div');
                     cursor.className = 'cursor';
                     cursor.style.backgroundColor = data.userColor;
-                    editor.parentElement.appendChild(cursor);
+                    editorContainer.appendChild(cursor);
                     cursors[data.userId] = cursor;
                 }
-                const rect = editor.getBoundingClientRect();
                 const cursor = cursors[data.userId];
-                cursor.style.left = `${rect.left + data.position.x}px`;
-                cursor.style.top = `${rect.top + data.position.y - 20}px`;
+                cursor.style.left = `${data.position.x}px`;
+                cursor.style.top = `${data.position.y}px`;
             }
 
             if (data.type === 'selection') {
@@ -192,14 +196,13 @@
                     const highlight = document.createElement('div');
                     highlight.className = 'highlight';
                     highlight.style.backgroundColor = data.userColor;
-                    editor.parentElement.appendChild(highlight);
+                    editorContainer.appendChild(highlight);
                     highlights[data.userId] = highlight;
                 }
-                const rect = editor.getBoundingClientRect();
                 const highlight = highlights[data.userId];
-                highlight.style.left = `${rect.left + data.selection.start}px`;
+                highlight.style.left = `${data.selection.start}px`;
                 highlight.style.width = `${data.selection.end - data.selection.start}px`;
-                highlight.style.top = `${rect.top}px`;
+                highlight.style.top = `0px`;
             }
         };
 
@@ -208,7 +211,6 @@
         });
 
         editor.addEventListener('mouseup', () => {
-            const selection = window.getSelection();
             const start = editor.selectionStart;
             const end = editor.selectionEnd;
 
